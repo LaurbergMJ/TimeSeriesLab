@@ -3,11 +3,11 @@ from __future__ import annotations
 import argparse
 import matplotlib.pyplot as plt
 
-from ts_lab.data_io import load_ohlc_data
-from ts_lab.features import make_supervised
-from ts_lab.split import train_test_split_time
-from ts_lab.models.linear_regression import make_linear_regression_pipeline
-from ts_lab.evaluation import regression_report
+from src.ts_lab.data_io import load_ohlc_data
+from src.ts_lab.features import make_supervised
+from src.ts_lab.split import train_test_split_time
+from src.ts_lab.models.linear_regression import make_linear_regression_pipeline
+from src.ts_lab.evaluation import regression_report
 
 def main() -> None:
     parser = argparse.ArgumentParser()
