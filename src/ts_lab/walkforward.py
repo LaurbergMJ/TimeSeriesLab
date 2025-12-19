@@ -5,6 +5,8 @@ from sklearn.base import clone
 from sklearn.model_selection import TimeSeriesSplit
 from dataclasses import dataclass
 from src.ts_lab.evaluation import regression_report
+from src.ts_lab.baselines import pred_zero, pred_last, pred_rolling_mean
+
 
 @dataclass
 class FoldResult:
@@ -12,18 +14,20 @@ class FoldResult:
     train_end: pd.Timestamp
     test_start: pd.Timestamp
     test_end: pd.Timestamp
-    metrics: dict[str, float]
     y_true: pd.Series 
-    y_pred: pd.Series 
+    preds: dict[str, pd.Series]
+    metrics: dict[str, float] 
 
-def walk_forward_cv(
+def walk_forward_cv_with_baselines(
         model, 
         X: pd.DataFrame,
         y: pd.Series,
-        n_splits: int = 5
+        n_splits: int = 5,
+        rolling_mean_window: int = 20
     ) -> tuple[pd.DataFrame, list[FoldResult]]:
 
     tscv = TimeSeriesSplit(n_splits=n_splits)
+    
     rows: list[dict] = []
     fold_results: list[FoldResult] = []
 
@@ -33,28 +37,45 @@ def walk_forward_cv(
 
         m = clone(model)
         m.fit(X_train, y_train)
-        y_pred_arr = m.predict(X_test)
+        y_pred_lr = pd.Series(m.predict(X_test), index=y_test.index, name="linear_regression")
 
-        y_pred = pd.Series(y_pred_arr, index=y_test.index, name="y_pred")
-        metrics = regression_report(y_test, y_pred_arr)
+        # --- Baselines (built using only y)
+        # Compute rolling mean using only past data
 
-        rows.append({
-            "fold": fold, 
-            "train_end": X_train.index[-1], 
-            "test_start": X_test.index[0],
-            "test_end": X_test.index[-1],
-            **metrics
-        }) 
+        y_all = pd.concat([y_train, y_test])
 
+        preds: dict[str, pd.Series] = {
+            "linear_regression": y_pred_lr,
+            "zero": pred_zero(y_test),
+            "last": pred_last(y_test),
+            f"mean_{rolling_mean_window}": pred_rolling_mean(
+                y_all=y_all, test_index=y_test.index, window=rolling_mean_window
+            ),
+        }
+
+        metrics: dict[str, dict[str, float]] = {}
+
+        for name, pred in preds.items():
+            met = regression_report(y_test, pred.values)
+            metrics[name] = met 
+            rows.append({
+                "fold": fold,
+                "model": name, 
+                "train_end": X_train.index[-1],
+                "test_start": X_test.index[0],
+                "test_end": X_test.index[-1],
+                **met
+            })
+                   
         fold_results.append(
             FoldResult(
                 fold=fold,
                 train_end=X_train.index[-1],
                 test_start=X_test.index[0],
                 test_end=X_test.index[-1],
-                metrics=metrics,
                 y_true=y_test,
-                y_pred=y_pred
+                preds=preds,
+                metrics=metrics,
             )
         )
 

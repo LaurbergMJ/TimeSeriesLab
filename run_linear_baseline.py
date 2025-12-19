@@ -8,8 +8,8 @@ from src.ts_lab.features import build_features
 from src.ts_lab.split import train_test_split_time
 from src.ts_lab.models.linear_regression import make_linear_regression_pipeline
 from src.ts_lab.evaluation import regression_report
-from src.ts_lab.plotting import plot_lin_reg, plot_folds
-from src.ts_lab.walkforward import walk_forward_cv
+from src.ts_lab.plotting import plot_lin_reg, plot_folds, plot_folds_multi
+from src.ts_lab.walkforward import walk_forward_cv_with_baselines
 
 def main() -> None:
     
@@ -19,6 +19,7 @@ def main() -> None:
     TEST_SIZE = 0.2
     RUN_WALK_FORWARD = True 
     N_SPLITS = 6
+    ROLLING_MEAN_WINDOW = 20
 
     X, y = build_features(close)
 
@@ -31,38 +32,30 @@ def main() -> None:
 
     model = make_linear_regression_pipeline()
 
-    metrics_df, fold_results = walk_forward_cv(model, X, y, n_splits=N_SPLITS)
-
-    print("\n=== Walk-forward results (Linear Regression) ===")
+    metrics_df, fold_results = walk_forward_cv_with_baselines(
+        model, 
+        X, y, 
+        n_splits=N_SPLITS,
+        rolling_mean_window=ROLLING_MEAN_WINDOW
+        )
+        
+    print("\n=== Walk-forward results (All models/baselines) ===")
     print(metrics_df)
 
-    print("\nSummary (mean):")
-    print(metrics_df[["mae", "rmse", "r2", "directional_accuracy", "corr"]].mean())
+    cols = ["mae", "rmse", "r2", "directional_accuracy", "corr"]
 
-    print("\nSummary (std):")
-    print(metrics_df[["mae", "rmse", "r2", "directional_accuracy", "corr"]].std())
+    print("\nSummary (mean by model) ===")
+    print(metrics_df.groupby("model")[cols].mean())
 
-    plot_folds(
+    print("\n=== Summary (std by model) === ")
+    print(metrics_df.groupby("model")[cols].std())
+
+    plot_folds_multi(
         fold_results,
-        title="Linear Regression walk-forward",
+        title="LR vs baselines (walk-forward)",
         max_cols=2,
-        show_scatter=False
+        include_models=["linear_regression", "zero", "last", f"mean_{ROLLING_MEAN_WINDOW}"]
     )
-
     
-    # --- snippet used for standard linear regression ---
-    # model.fit(X_train, y_train)
-    # y_pred = model.predict(X_test)
-
-    # report = regression_report(y_test, y_pred)
-
-    # print("\n=== Linear Regression Baseline ===")
-    # for k, v in report.items():
-    #     print(f"{k:>22s}: {v:.6f}")
-    # plot_lin_reg(y_test, y_pred, label="SX5E index")
-    # ---------------------------------------------------
-
-   
-
 if __name__ == "__main__":
     main()

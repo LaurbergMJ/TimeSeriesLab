@@ -55,3 +55,46 @@ def plot_folds(
         fig2.tight_layout()
     
     plt.show()
+
+def plot_folds_multi(
+        fold_results: list[FoldResult],
+        title: str = "Walk-forward folds: actual vs predictions",
+        max_cols: int = 2,
+        include_models: list[str] | None = None
+) -> None:
+    
+    """
+    For each fold, plot actual plus multiple model/baseline predictions
+    """
+
+    n = len(fold_results)
+    cols = min(max_cols, n)
+    rows = math.ceil(n / cols)
+
+    fig = plt.figure()
+
+    for i, fr in enumerate(fold_results, start=1):
+        ax = fig.add_subplot(rows, cols, i)
+        ax.plot(fr.y_true.index, fr.y_true_values, label="actual")
+
+        names = list(fr.preds.keys())
+        if include_models is not None:
+            names = [nm for nm in names if nm in include_models]
+
+        for name in names:
+            ax.plot(fr.preds[name].index, fr.preds[name].values, label=name)
+
+        if "linear_regression" in fr.metrics:
+            rmse = fr.metrics["linear_regression"]["rmse"]
+            corr = fr.metrics["linear_regression"]["corr"]
+            ax.set_title(f"Fold {fr.fold} | LR rmse={rmse:.4f} | corr={corr:.3f}")
+        
+        else:
+            ax.set_title(f"Fold {fr.fold}")
+
+        ax.tick_params(axis="x", labelrotation=25)
+        ax.legend()
+
+    fig.suptitle(title)
+    fig.tight_layout()
+    plt.show()
