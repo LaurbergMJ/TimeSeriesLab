@@ -75,7 +75,7 @@ def plot_folds_multi(
 
     for i, fr in enumerate(fold_results, start=1):
         ax = fig.add_subplot(rows, cols, i)
-        ax.plot(fr.y_true.index, fr.y_true_values, label="actual")
+        ax.plot(fr.y_true.index, fr.y_true.values, label="actual")
 
         names = list(fr.preds.keys())
         if include_models is not None:
