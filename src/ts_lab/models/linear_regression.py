@@ -6,6 +6,6 @@ from sklearn.preprocessing import StandardScaler
 
 def make_linear_regression_pipeline() -> Pipeline:
     return Pipeline([
-        ("scaler", StandardScaler(with_mean=True, with_std=True)),
-        ("model", LinearRegression())])
+        ("scaler", StandardScaler()),
+        ("lr", LinearRegression())])
 
