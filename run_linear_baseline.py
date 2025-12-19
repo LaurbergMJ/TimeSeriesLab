@@ -54,7 +54,8 @@ def main() -> None:
         fold_results,
         title="LR vs baselines (walk-forward)",
         max_cols=2,
-        include_models=["linear_regression", "zero", "last", f"mean_{ROLLING_MEAN_WINDOW}"]
+        include_models=["linear_regression", f"mean_{ROLLING_MEAN_WINDOW}"]
+        #include_models=["linear_regression", "zero", "last", f"mean_{ROLLING_MEAN_WINDOW}"]
     )
     
 if __name__ == "__main__":
