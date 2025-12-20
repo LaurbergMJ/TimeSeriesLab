@@ -11,6 +11,7 @@ from src.ts_lab.evaluation import regression_report
 from src.ts_lab.plotting import plot_lin_reg, plot_folds, plot_folds_multi
 from src.ts_lab.walkforward import walk_forward_cv_with_baselines
 from src.ts_lab.feature_checks import print_feature_sanity, plot_feature_corr_with_target
+from src.ts_lab.experiments import evaluate_feature_sets
 
 def main() -> None:
     
@@ -19,12 +20,29 @@ def main() -> None:
 
     TEST_SIZE = 0.2
     RUN_WALK_FORWARD = True 
-    N_SPLITS = 6
+    #FEATURE_SET = "v1_full" # Choose between "v1" or "basic"
+    PHASE2_COMPARE_FEATURE_SETS = True 
+    FEATURE_SETS = ["v1_full", "v1_small", "v1_no_trend", "v1_no_vol", "v1_no_dd"]
+    HORIZON = 1 
+    N_SPLITS = 6 
     ROLLING_MEAN_WINDOW = 20
-    FEATURE_SET = "v1_full" # Choose between "v1" or "basic"
-    HORIZON = 1
 
-    X, y = make_supervised(close, feature_set=FEATURE_SET, horizon=HORIZON)
+    model = make_linear_regression_pipeline()
+
+    summary, per_set = evaluate_feature_sets(
+        close=close, 
+        model=model,
+        feature_sets=FEATURE_SETS,
+        horizon=HORIZON,
+        n_splits=N_SPLITS,
+        rolling_mean_window=ROLLING_MEAN_WINDOW
+    )
+
+    print("\n=== Phase 2 step 2: Feature set comparison (mean across folds) ===")
+    print(summary.sort_values(["model", "rmse"]))
+
+
+    #X, y = make_supervised(close, feature_set=FEATURE_SET, horizon=HORIZON)
     
     # simple chronological split 
     # X_train, X_test, y_train, y_test = train_test_split_time(
@@ -61,7 +79,7 @@ def main() -> None:
     #     #include_models=["linear_regression", "zero", "last", f"mean_{ROLLING_MEAN_WINDOW}"]
     # )
 
-    print(X)
+    #print(X)
     #plot_feature_corr_with_target(X, y, top_n=20)
     
 if __name__ == "__main__":
