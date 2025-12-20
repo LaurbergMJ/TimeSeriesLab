@@ -21,31 +21,31 @@ def main() -> None:
     RUN_WALK_FORWARD = True 
     N_SPLITS = 6
     ROLLING_MEAN_WINDOW = 20
-    FEATURE_SET = "v1" # Choose between "v1" or "basic"
+    FEATURE_SET = "v1_full" # Choose between "v1" or "basic"
     HORIZON = 1
 
     X, y = make_supervised(close, feature_set=FEATURE_SET, horizon=HORIZON)
     
     # simple chronological split 
-    X_train, X_test, y_train, y_test = train_test_split_time(
-        X, 
-        y, 
-        test_size=TEST_SIZE)
+    # X_train, X_test, y_train, y_test = train_test_split_time(
+    #     X, 
+    #     y, 
+    #     test_size=TEST_SIZE)
     
 
-    model = make_linear_regression_pipeline()
+    # model = make_linear_regression_pipeline()
 
-    metrics_df, fold_results = walk_forward_cv_with_baselines(
-        model, 
-        X, y, 
-        n_splits=N_SPLITS,
-        rolling_mean_window=ROLLING_MEAN_WINDOW
-        )
+    # metrics_df, fold_results = walk_forward_cv_with_baselines(
+    #     model, 
+    #     X, y, 
+    #     n_splits=N_SPLITS,
+    #     rolling_mean_window=ROLLING_MEAN_WINDOW
+    #     )
         
     #print("\n=== Walk-forward results (All models/baselines) ===")
     #print(metrics_df)
 
-    cols = ["mae", "rmse", "r2", "directional_accuracy", "corr"]
+    #cols = ["mae", "rmse", "r2", "directional_accuracy", "corr"]
 
     #print("\nSummary (mean by model) ===")
     #print(metrics_df.groupby("model")[cols].mean())
@@ -61,8 +61,8 @@ def main() -> None:
     #     #include_models=["linear_regression", "zero", "last", f"mean_{ROLLING_MEAN_WINDOW}"]
     # )
 
-    print_feature_sanity(X)
-    plot_feature_corr_with_target(X, y, top_n=20)
+    print(X)
+    #plot_feature_corr_with_target(X, y, top_n=20)
     
 if __name__ == "__main__":
     main()
