@@ -21,8 +21,10 @@ def main() -> None:
     RUN_WALK_FORWARD = True 
     N_SPLITS = 6
     ROLLING_MEAN_WINDOW = 20
+    FEATURE_SET = "v1" # Choose between "v1" or "basic"
+    HORIZON = 1
 
-    X, y = make_supervised(close, feature_set="basic", horizon=1)
+    X, y = make_supervised(close, feature_set=FEATURE_SET, horizon=HORIZON)
     
     # simple chronological split 
     X_train, X_test, y_train, y_test = train_test_split_time(
