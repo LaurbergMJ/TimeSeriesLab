@@ -22,7 +22,7 @@ filename = "data/eod_SX5E_index.csv"
 USE_FIRST_CSV_IF_NOT_FOUND = True
 
 TEST_SIZE = 0.2
-N_SPLITS = 6
+N_SPLITS = 12
 HORIZON = 1
 ROLLING_MEAN_WINDOW = 20
 
@@ -69,62 +69,56 @@ def main() -> None:
         plt.show()
 
     
+    if RUN_WALK_FORWARD:
+        X, y = make_supervised(close, feature_set="basic", horizon=HORIZON)
 
+        print_feature_sanity(X)
+        plot_feature_corr_with_target(X, y, top_n=20)
 
+        metrics_df, fold_results = walk_forward_cv_with_baselines(
+            model,
+            X,y,
+            n_splits=N_SPLITS,
+            rolling_mean_window=ROLLING_MEAN_WINDOW,
+        )
 
+        print("\n=== Phase 1: Walk-forward results (all models) ===")
+        print(metrics_df)
 
-    summary, per_set = evaluate_feature_sets(
-        close=close, 
-        model=model,
-        feature_sets=FEATURE_SETS,
-        horizon=HORIZON,
-        n_splits=N_SPLITS,
-        rolling_mean_window=ROLLING_MEAN_WINDOW
-    )
+        cols = ["mae", "rmse", "r2", "directional_accuracy", "corr"]
+        print("\n=== Phase 1 summary (mean by model) ===")
+        print(metrics_df.groupby("model")[cols].std())
 
-    #print("\n=== Phase 2 step 2: Feature set comparison (mean across folds) ===")
-    #print(summary.sort_values(["model", "rmse"]))
+        plot_folds_multi(
+            fold_results,
+            title="Phase 1: Linear Regression vs baselines",
+            max_cols=2,
+            include_models=[
+                "linear_regression",
+                "zero",
+                "last",
+                f"mean_{ROLLING_MEAN_WINDOW}",
+            ],
+        )
 
+    if RUN_PHASE2_FEATURE_COMPARE:
+        summary, per_set = evaluate_feature_sets(
+            close=close, 
+            model=model,
+            feature_sets=FEATURE_SETS,
+            horizon=HORIZON,
+            n_splits=N_SPLITS,
+            rolling_mean_window=ROLLING_MEAN_WINDOW,
+        )
 
-    X, y = make_supervised(close, feature_set=FEATURE_SETS, horizon=HORIZON)
-    
-    # simple chronological split 
-    # X_train, X_test, y_train, y_test = train_test_split_time(
-    #     X, 
-    #     y, 
-    #     test_size=TEST_SIZE)
-    
+        print("\n=== Phase 2 step 2: Feature set comparison (mean across folds) ===")
+        print(summary.sort_values(["model", "rmse"]))
 
-    # model = make_linear_regression_pipeline()
-
-    # metrics_df, fold_results = walk_forward_cv_with_baselines(
-    #     model, 
-    #     X, y, 
-    #     n_splits=N_SPLITS,
-    #     rolling_mean_window=ROLLING_MEAN_WINDOW
-    #     )
-        
-    #print("\n=== Walk-forward results (All models/baselines) ===")
-    #print(metrics_df)
-
-    #cols = ["mae", "rmse", "r2", "directional_accuracy", "corr"]
-
-    #print("\nSummary (mean by model) ===")
-    #print(metrics_df.groupby("model")[cols].mean())
-
-    #print("\n=== Summary (std by model) === ")
-    #print(metrics_df.groupby("model")[cols].std())
-
-    # plot_folds_multi(
-    #     fold_results,
-    #     title="LR vs baselines (walk-forward)",
-    #     max_cols=2,
-    #     include_models=["linear_regression", f"mean_{ROLLING_MEAN_WINDOW}"]
-    #     #include_models=["linear_regression", "zero", "last", f"mean_{ROLLING_MEAN_WINDOW}"]
-    # )
-
-    #print(X)
-    #plot_feature_corr_with_target(X, y, top_n=20)
+        print("\n=== Linear Regression only (best -> worst by RMSE) ===")
+        print(
+            summary[summary["model"] == "linear_regression"]
+            .sort_values("rmse")
+        )
     
 if __name__ == "__main__":
     main()
