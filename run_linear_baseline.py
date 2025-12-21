@@ -18,11 +18,20 @@ def main() -> None:
     filename = "data/eod_SX5E_index.csv"
     close = load_close_data(filename)
 
-    TEST_SIZE = 0.2
-    RUN_WALK_FORWARD = True 
+    #TEST_SIZE = 0.2
+    #RUN_WALK_FORWARD = True 
     #FEATURE_SET = "v1_full" # Choose between "v1" or "basic"
-    PHASE2_COMPARE_FEATURE_SETS = True 
-    FEATURE_SETS = ["v1_full", "v1_small", "v1_no_trend", "v1_no_vol", "v1_no_dd"]
+    #PHASE2_COMPARE_FEATURE_SETS = True 
+    
+    FEATURE_SETS = [
+        "basic",
+        "v1_small",        
+        "v1_full", 
+        "v1_no_trend", 
+        "v1_no_vol", 
+        "v1_no_dd",
+    ]   
+    
     HORIZON = 1 
     N_SPLITS = 6 
     ROLLING_MEAN_WINDOW = 20
@@ -38,8 +47,8 @@ def main() -> None:
         rolling_mean_window=ROLLING_MEAN_WINDOW
     )
 
-    print("\n=== Phase 2 step 2: Feature set comparison (mean across folds) ===")
-    print(summary.sort_values(["model", "rmse"]))
+    #print("\n=== Phase 2 step 2: Feature set comparison (mean across folds) ===")
+    #print(summary.sort_values(["model", "rmse"]))
 
 
     #X, y = make_supervised(close, feature_set=FEATURE_SET, horizon=HORIZON)

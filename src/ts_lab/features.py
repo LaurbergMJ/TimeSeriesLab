@@ -97,6 +97,13 @@ def build_feature_families_v1(close: pd.Series) -> dict[str, pd.DataFrame]:
         vol[f"absr_mean_{w}"] = abs_r.shift(1).rolling(w).mean()
     fam["vol"] = vol
 
+    # TREND
+    trend = pd.DataFrame(index=idx)
+    for w in [20, 60, 120]:
+        ma = close.rolling(w).mean()
+        trend[f"trend_ma_{w}"] = close / ma - 1.0
+    fam["trend"] = trend 
+
     # DRAWDOWN / DISTANCE-TO-HIGHS
     dd = pd.DataFrame(index=idx)
     for w in [60, 252]:
@@ -158,7 +165,7 @@ def make_supervised(
     if feature_set == "basic":
         X = build_features_basic(close)
 
-    elif feature_set == {"v1_full", "v1_small", "v1_no_trend", "v1_no_vol", "v1_no_dd"}:
+    elif feature_set in {"v1_full", "v1_small", "v1_no_trend", "v1_no_vol", "v1_no_dd"}:
         X = build_features_v1_variant(close, feature_set)
     else:
         raise ValueError("feature_set not recognized")
