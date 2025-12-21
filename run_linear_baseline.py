@@ -14,9 +14,9 @@ from src.ts_lab.experiments import evaluate_feature_sets
 from src.ts_lab.feature_checks import print_feature_sanity, plot_feature_corr_with_target
 from src.ts_lab.split import train_test_split_time
 
-#------------
+#-------------
 # Lab Settings
-#------------
+#-------------
 
 filename = "data/eod_SX5E_index.csv"
 USE_FIRST_CSV_IF_NOT_FOUND = True
