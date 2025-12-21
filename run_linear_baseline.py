@@ -3,40 +3,75 @@ from __future__ import annotations
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-from src.ts_lab.data_io import load_close_data
+from src.ts_lab.settings import SETTINGS
+from src.ts_lab.data_io import load_close_data, list_csv_files
 from src.ts_lab.features import make_supervised 
-from src.ts_lab.split import train_test_split_time
 from src.ts_lab.models.linear_regression import make_linear_regression_pipeline
 from src.ts_lab.evaluation import regression_report
-from src.ts_lab.plotting import plot_lin_reg, plot_folds, plot_folds_multi
 from src.ts_lab.walkforward import walk_forward_cv_with_baselines
-from src.ts_lab.feature_checks import print_feature_sanity, plot_feature_corr_with_target
+from src.ts_lab.plotting import plot_lin_reg, plot_folds, plot_folds_multi
 from src.ts_lab.experiments import evaluate_feature_sets
+from src.ts_lab.feature_checks import print_feature_sanity, plot_feature_corr_with_target
+from src.ts_lab.split import train_test_split_time
+
+#------------
+# Lab Settings
+#------------
+
+filename = "data/eod_SX5E_index.csv"
+USE_FIRST_CSV_IF_NOT_FOUND = True
+
+TEST_SIZE = 0.2
+N_SPLITS = 6
+HORIZON = 1
+ROLLING_MEAN_WINDOW = 20
+
+# Phase toggles
+RUN_SINGLE_SPLIT = False 
+RUN_WALK_FORWARD = True 
+RUN_PHASE2_FEATURE_COMPARE = True
+
+FEATURE_SETS = [
+    "basic",
+    "v1_small",        
+    "v1_full", 
+    "v1_no_trend", 
+    "v1_no_vol", 
+    "v1_no_dd",
+]
 
 def main() -> None:
-    
-    filename = "data/eod_SX5E_index.csv"
-    close = load_close_data(filename)
 
-    #TEST_SIZE = 0.2
-    #RUN_WALK_FORWARD = True 
-    #FEATURE_SET = "v1_full" # Choose between "v1" or "basic"
-    #PHASE2_COMPARE_FEATURE_SETS = True 
-    
-    FEATURE_SETS = [
-        "basic",
-        "v1_small",        
-        "v1_full", 
-        "v1_no_trend", 
-        "v1_no_vol", 
-        "v1_no_dd",
-    ]   
-    
-    HORIZON = 1 
-    N_SPLITS = 6 
-    ROLLING_MEAN_WINDOW = 20
-
+    close = load_close_data(filename)     
     model = make_linear_regression_pipeline()
+
+    if RUN_SINGLE_SPLIT:
+        X, y = make_supervised(close, feature_set="basic", horizon=HORIZON)
+
+        cut = int(len(X) * (1 - TEST_SIZE))
+        X_train, X_test = X.iloc[:cut], X.iloc[cut:]
+        y_train, y_test = y.iloc[:cut], y.iloc[cut:]
+        
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+
+        report = regression_report(y_test, y_pred)
+        print("\n=== Single split (sanity) ===")
+        for key, value in report.items():
+            print(f"{key:>22s}: {value:-6f}")
+
+        plt.figure()
+        plt.plot(y_test.index, y_test.values, label="actual")
+        plt.plot(y_test.index, y_pred, label="pred")
+        plt.legend()
+        plt.title("Single split sanity check")
+        plt.tight_layout()
+        plt.show()
+
+    
+
+
+
 
     summary, per_set = evaluate_feature_sets(
         close=close, 
@@ -51,7 +86,7 @@ def main() -> None:
     #print(summary.sort_values(["model", "rmse"]))
 
 
-    #X, y = make_supervised(close, feature_set=FEATURE_SET, horizon=HORIZON)
+    X, y = make_supervised(close, feature_set=FEATURE_SETS, horizon=HORIZON)
     
     # simple chronological split 
     # X_train, X_test, y_train, y_test = train_test_split_time(

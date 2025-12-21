@@ -12,7 +12,7 @@ def _zscore(x: pd.Series, window: int) -> pd.Series:
     sig = x.rolling(window).std()
     return (x - mu) / sig 
 
-def build_features_basic(close: pd.Series) -> tuple[pd.DataFrame, pd.Series]:
+def build_features_basic(close: pd.Series) -> pd.DataFrame:
 
     r = compute_returns(close)
 
@@ -167,6 +167,7 @@ def make_supervised(
 
     elif feature_set in {"v1_full", "v1_small", "v1_no_trend", "v1_no_vol", "v1_no_dd"}:
         X = build_features_v1_variant(close, feature_set)
+    
     else:
         raise ValueError("feature_set not recognized")
     
