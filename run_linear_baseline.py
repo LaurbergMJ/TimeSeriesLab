@@ -26,7 +26,7 @@ filename = "data/eod_SX5E_index.csv"
 USE_FIRST_CSV_IF_NOT_FOUND = True
 
 TEST_SIZE = 0.2
-N_SPLITS = 12
+N_SPLITS = 6
 HORIZON = 5
 ROLLING_MEAN_WINDOW = 20
 
@@ -39,7 +39,7 @@ RUN_PHASE3_COEF_STABILITY = False
 PHASE3_FEATURE_SET = "basic" 
 PHASE3_SCORING = "neg_root_mean_squared_error"
 RUN_PHASE4_TREES = True 
-PHASE4_FEATURE_SET = "basic"
+PHASE4_FEATURE_SET = "v1_small"
 PHASE4_HORIZON = 1
 
 FEATURE_SETS = [
