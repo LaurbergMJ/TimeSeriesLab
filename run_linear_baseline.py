@@ -7,13 +7,14 @@ from src.ts_lab.settings import SETTINGS
 from src.ts_lab.data_io import load_close_data, list_csv_files
 from src.ts_lab.features import make_supervised 
 from src.ts_lab.models.linear_regression import make_linear_regression_pipeline
+from src.ts_lab.models.regularized import make_ridge, make_lasso, make_elasticnet
+from src.ts_lab.models.trees import make_random_forest, make_hist_gb
 from src.ts_lab.evaluation import regression_report
 from src.ts_lab.walkforward import walk_forward_cv_with_baselines
 from src.ts_lab.plotting import plot_lin_reg, plot_folds, plot_folds_multi
 from src.ts_lab.experiments import evaluate_feature_sets
 from src.ts_lab.feature_checks import print_feature_sanity, plot_feature_corr_with_target
 from src.ts_lab.split import train_test_split_time
-from src.ts_lab.models.regularized import make_ridge, make_lasso, make_elasticnet
 from src.ts_lab.tuning import tune_model_ts
 from src.ts_lab.coef_stability import collect_fold_coefs, coef_stability_summary
 
@@ -26,17 +27,20 @@ USE_FIRST_CSV_IF_NOT_FOUND = True
 
 TEST_SIZE = 0.2
 N_SPLITS = 12
-HORIZON = 1
+HORIZON = 5
 ROLLING_MEAN_WINDOW = 20
 
 # Phase toggles
 RUN_SINGLE_SPLIT = False 
 RUN_WALK_FORWARD = True 
-RUN_PHASE2_FEATURE_COMPARE = True
-RUN_PHASE3_TUNING = True 
-RUN_PHASE3_COEF_STABILITY = True 
-PHASE3_FEATURE_SET = "v1_small"
+RUN_PHASE2_FEATURE_COMPARE = False
+RUN_PHASE3_TUNING = False
+RUN_PHASE3_COEF_STABILITY = False 
+PHASE3_FEATURE_SET = "basic" 
 PHASE3_SCORING = "neg_root_mean_squared_error"
+RUN_PHASE4_TREES = True 
+PHASE4_FEATURE_SET = "basic"
+PHASE4_HORIZON = 1
 
 FEATURE_SETS = [
     "basic",
@@ -123,8 +127,7 @@ def main() -> None:
 
         print("\n=== Linear Regression only (best -> worst by RMSE) ===")
         print(
-            summary[summary["model"] == "linear_regression"]
-            .sort_values("rmse")
+            summary[summary["model"] == "linear_regression"].sort_values("rmse")
         )
 
     if RUN_PHASE3_TUNING or RUN_PHASE3_COEF_STABILITY:
@@ -182,8 +185,43 @@ def main() -> None:
             print("\n=== Phase 3: Ridge coefficient stability (top 20 by coef_std) ===")
             print(summary.head(20))
 
-        
+    if RUN_PHASE4_TREES:
 
+        X, y = make_supervised(
+            close, 
+            feature_set=PHASE4_FEATURE_SET,
+            horizon=PHASE4_HORIZON,
+        )
+
+        tree_models = {
+            "random_forest": make_random_forest(),
+            "hist_gb": make_hist_gb(),
+        }
+
+        for name, model_tree in tree_models.items():
+            print(f"\n==== Phase 4: {name} (walk-forward) ===")
+
+            metrics_df, fold_results = walk_forward_cv_with_baselines(
+                model_tree,
+                X, y,
+                n_splits=N_SPLITS,
+                rolling_mean_window=ROLLING_MEAN_WINDOW,
+            )
+        
+            cols = ["mae", "rmse", "r2", "directional_accuracy", "corr"]
+            print(metrics_df.groupby("model")[cols].mean())
+
+            plot_folds_multi(
+                fold_results,
+                title=f"Phase 4: {name} vs baselines",
+                include_models=[
+                    name,
+                    "zero",
+                    "mean_20",
+                ],
+            )
+
+   
     
 if __name__ == "__main__":
     main()

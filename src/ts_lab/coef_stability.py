@@ -58,5 +58,5 @@ def coef_stability_summary(coefs: pd.DataFrame) -> pd.DataFrame:
         "coef_std": std, 
         "sign_flip_rate": flip_rate,
     }).sort_values("coef_std", ascending=False)
-
+    return out
     

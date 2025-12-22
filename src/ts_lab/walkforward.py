@@ -23,7 +23,8 @@ def walk_forward_cv_with_baselines(
         X: pd.DataFrame,
         y: pd.Series,
         n_splits: int = 5,
-        rolling_mean_window: int = 20
+        rolling_mean_window: int = 20, 
+        model_name: str = "model",
     ) -> tuple[pd.DataFrame, list[FoldResult]]:
 
     tscv = TimeSeriesSplit(n_splits=n_splits)
@@ -37,7 +38,7 @@ def walk_forward_cv_with_baselines(
 
         m = clone(model)
         m.fit(X_train, y_train)
-        y_pred_lr = pd.Series(m.predict(X_test), index=y_test.index, name="linear_regression")
+        y_pred_main = pd.Series(m.predict(X_test), index=y_test.index, name=model_name)
 
         # --- Baselines (built using only y)
         # Compute rolling mean using only past data
@@ -45,7 +46,7 @@ def walk_forward_cv_with_baselines(
         y_all = pd.concat([y_train, y_test])
 
         preds: dict[str, pd.Series] = {
-            "linear_regression": y_pred_lr,
+            model_name: y_pred_main,
             "zero": pred_zero(y_test),
             "last": pred_last(y_test),
             f"mean_{rolling_mean_window}": pred_rolling_mean(
