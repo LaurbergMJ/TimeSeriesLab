@@ -13,6 +13,9 @@ from src.ts_lab.plotting import plot_lin_reg, plot_folds, plot_folds_multi
 from src.ts_lab.experiments import evaluate_feature_sets
 from src.ts_lab.feature_checks import print_feature_sanity, plot_feature_corr_with_target
 from src.ts_lab.split import train_test_split_time
+from src.ts_lab.models.regularized import make_ridge, make_lasso, make_elasticnet
+from src.ts_lab.tuning import tune_model_ts
+from src.ts_lab.coef_stability import collect_fold_coefs, coef_stability_summary
 
 #-------------
 # Lab Settings
@@ -30,6 +33,10 @@ ROLLING_MEAN_WINDOW = 20
 RUN_SINGLE_SPLIT = False 
 RUN_WALK_FORWARD = True 
 RUN_PHASE2_FEATURE_COMPARE = True
+RUN_PHASE3_TUNING = True 
+RUN_PHASE3_COEF_STABILITY = True 
+PHASE3_FEATURE_SET = "v1_small"
+PHASE3_SCORING = "neg_root_mean_squared_error"
 
 FEATURE_SETS = [
     "basic",
@@ -119,6 +126,64 @@ def main() -> None:
             summary[summary["model"] == "linear_regression"]
             .sort_values("rmse")
         )
+
+    if RUN_PHASE3_TUNING or RUN_PHASE3_COEF_STABILITY:
+
+        X, y = make_supervised(close, feature_set=PHASE3_FEATURE_SET, horizon=HORIZON)
+
+        # 1) Tune Ridge model
+        ridge = make_ridge(alpha=1.0)
+        ridge_grid = {"model__alpha": [1e-4, 1e-3, 1e-2, 1e-1, 1, 10, 100, 1_000]}
+        gs_ridge = tune_model_ts(ridge, ridge_grid, X, y, n_splits=N_SPLITS, scoring=PHASE3_SCORING)
+        print("\n=== Phase 3: Ridge tuning ===")
+        print("Best params:", gs_ridge.best_params_)
+        print("Best CV score:", gs_ridge.best_score_)
+
+        # 2) Tune Lasso 
+        lasso = make_lasso(alpha=0.001)
+        lasso_grid = {"model__alpha": [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]}
+        gs_lasso = tune_model_ts(lasso, lasso_grid, X, y, n_splits=N_SPLITS, scoring=PHASE3_SCORING)
+        print("\n=== Phase 3: Lasso tuning ===")
+        print("Best params:", gs_lasso.best_params_)
+        print("Best CV score:", gs_lasso.best_score_)
+
+        # 3) Tune ElasticNet
+        enet = make_elasticnet(alpha=0.001, l1_ratio=0.5)
+        enet_grid = {
+            "model__alpha": [1e-5, 1e-4, 1e-3, 1e-2],
+            "model__l1_ratio": [0.1, 0.3, 0.5, 0.7, 0.9],
+        }
+        gs_enet = tune_model_ts(enet, enet_grid, X, y, n_splits=N_SPLITS, scoring=PHASE3_SCORING)
+        print("\n=== Phase 3: ElasticNet tuning ===")
+        print("Best params:", gs_enet.best_params_)
+        print("Best CV score", gs_enet.best_score_)
+
+        # --- Evaluate the tuned models (walk-forward)
+        tuned_models = {
+            "ridge_tuned": gs_ridge.best_estimator_,
+            "lasso_tuned": gs_lasso.best_estimator_,
+            "enet_tuned": gs_enet.best_estimator_,
+        }
+
+        for name, m in tuned_models.items():
+            metrics_df, _ = walk_forward_cv_with_baselines(
+                m, X, y,
+                n_splits=N_SPLITS,
+                rolling_mean_window=ROLLING_MEAN_WINDOW
+            )
+            cols = ["mae", "rmse", "r2", "directional_accuracy", "corr"]
+            print(f"\n=== {name} walk-forward summary (mean by model) ===")
+            print(metrics_df.groupby("model")[cols].mean())
+
+        # --- Coefficient stability
+        if RUN_PHASE3_COEF_STABILITY:
+            coefs = collect_fold_coefs(gs_ridge.best_estimator_, X, y, n_splits=N_SPLITS)
+            summary = coef_stability_summary(coefs)
+            print("\n=== Phase 3: Ridge coefficient stability (top 20 by coef_std) ===")
+            print(summary.head(20))
+
+        
+
     
 if __name__ == "__main__":
     main()
