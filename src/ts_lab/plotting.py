@@ -1,5 +1,7 @@
+from __future__ import annotations
 import matplotlib.pyplot as plt
 import math
+import pandas as pd 
 from src.ts_lab.walkforward import FoldResult 
 
 def plot_lin_reg(test_values, pred_values, label: str | None ):
@@ -98,3 +100,37 @@ def plot_folds_multi(
     fig.suptitle(title)
     fig.tight_layout()
     plt.show()
+
+
+def plot_regimes_over_price(close: pd.Series, regimes: pd.Series, title: str = "Regimes over price") -> None:
+    """
+    Simple plot: price line + colored markers by regime
+    """
+
+    df = pd.concat([close.rename("close"), regimes.rename("regime")], axis=1).dropna()
+
+    plt.figure()
+    plt.plot(df.index, df["close"].values, label="close")
+
+    # Overlay regime points
+    for reg in sorted(df["regime"].unique()):
+        mask = df["regime"] == reg 
+        plt.scatter(df.index[mask], df["close"][mask], s=8, label=f"regime {reg}")
+
+    plt.title(title)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+def summarize_regimes(regime_X: pd.DataFrame, regimes: pd.Series) -> pd.DataFrame:
+    """
+    Returns mean regime feature values per regime + counts
+    """
+
+    df = pd.concat([regime_X, regimes.rename("regime")], axis=1).dropna()
+    out = df.groupby("regime").agg(["mean", "std"])
+    counts = df["regime"].value_counts().sort_index()
+    out[("meta", "count")] = counts 
+    return out 
+

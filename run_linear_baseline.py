@@ -11,12 +11,14 @@ from src.ts_lab.models.regularized import make_ridge, make_lasso, make_elasticne
 from src.ts_lab.models.trees import make_random_forest, make_hist_gb
 from src.ts_lab.evaluation import regression_report
 from src.ts_lab.walkforward import walk_forward_cv_with_baselines
-from src.ts_lab.plotting import plot_lin_reg, plot_folds, plot_folds_multi
+from src.ts_lab.plotting import plot_lin_reg, plot_folds, plot_folds_multi, plot_regimes_over_price, summarize_regimes
 from src.ts_lab.experiments import evaluate_feature_sets
 from src.ts_lab.feature_checks import print_feature_sanity, plot_feature_corr_with_target
 from src.ts_lab.split import train_test_split_time
 from src.ts_lab.tuning import tune_model_ts
 from src.ts_lab.coef_stability import collect_fold_coefs, coef_stability_summary
+from src.ts_lab.regimes import assign_regimes
+from src.ts_lab.regime_eval import metrics_by_regime
 
 #-------------
 # Lab Settings
@@ -38,9 +40,13 @@ RUN_PHASE3_TUNING = False
 RUN_PHASE3_COEF_STABILITY = False 
 PHASE3_FEATURE_SET = "basic" 
 PHASE3_SCORING = "neg_root_mean_squared_error"
-RUN_PHASE4_TREES = True 
+RUN_PHASE4_TREES = False 
 PHASE4_FEATURE_SET = "v1_small"
 PHASE4_HORIZON = 1
+RUN_PHASE5_REGIMES = True 
+N_REGIMES = 3
+PHASE5_MODEL_FEATURE_SET = "basic"
+PHASE5_HORIZON = 1
 
 FEATURE_SETS = [
     "basic",
@@ -220,6 +226,29 @@ def main() -> None:
                     "mean_20",
                 ],
             )
+
+    if RUN_PHASE5_REGIMES:
+        
+        # 1) Fit regimes on the full history (first pass)
+        regime_X, regime_labels, _ = assign_regimes(close, n_regimes=N_REGIMES)
+        print("\n=== Phase 5: Regime summary (feature means/std + counts) ===")
+        print(summarize_regimes(regime_X, regime_labels))
+
+        plot_regimes_over_price(close, regime_labels, title=f"Phase 5: KMeans regimes (K={N_REGIMES})")
+
+        # 2) Build supervised dataset for forecasting task
+        X, y = make_supervised(close, feature_set=PHASE5_MODEL_FEATURE_SET, horizon=PHASE5_HORIZON)
+
+        # align regimes to the supervised target index
+        regimes_aligned = regime_labels.reindex(X.index)
+
+        # 3) Run walk-forward for the chosen model 
+        model
+
+
+
+
+
 
    
     
