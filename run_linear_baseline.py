@@ -243,7 +243,37 @@ def main() -> None:
         regimes_aligned = regime_labels.reindex(X.index)
 
         # 3) Run walk-forward for the chosen model 
-        model
+        model = make_ridge(alpha=1.0)
+        metrics_df, fold_results = walk_forward_cv_with_baselines(
+            model,
+            X, y,
+            n_splits=N_SPLITS,
+            rolling_mean_window=ROLLING_MEAN_WINDOW,
+            model_name="ridge"
+        )
+
+        # 4) Evaluate per-fold and regime-conditioned 
+        print("\n=== Phase 5: Walk-forward mean metrics ===")
+        cols = ["mae", "rmse", "r2", "directional_accuracy", "corr"]
+        print(metrics_df.groupby("model")[cols].mean())
+
+        # Regime-conditioned metrics using the stitched predictions from folds
+
+        all_true = []
+        all_pred = []
+        for fr in fold_results:
+            if "ridge" in fr.preds:
+                all_true.append(fr.y_true)
+                all_pred.append(fr.preds["ridege"])
+
+        y_true_all = pd.concat(all_true).sort_index()
+        y_pred_all = pd.concat(all_pred).sort_index()
+
+        by_regime = metrics_by_regime(y_true_all, y_pred_all, regimes_aligned)
+        print("\n=== Phase 5: Regime-conditioned metrics (ridge) ===")
+        print(by_regime)
+
+        
 
 
 
