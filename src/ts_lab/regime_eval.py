@@ -27,6 +27,6 @@ def metrics_by_regime(
         met = regression_report(sub["y_true"], sub["y_pred"].values)
         rows.append({"regime": int(reg), "n": len(sub), **met})
     
-    return pd.DataFrame(rows).sort_index("regime") 
+    return pd.DataFrame(rows).sort_values("regime") 
     
     

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from src.ts_lab.settings import SETTINGS
 from src.ts_lab.data_io import load_close_data, list_csv_files
@@ -264,7 +265,7 @@ def main() -> None:
         for fr in fold_results:
             if "ridge" in fr.preds:
                 all_true.append(fr.y_true)
-                all_pred.append(fr.preds["ridege"])
+                all_pred.append(fr.preds["ridge"])
 
         y_true_all = pd.concat(all_true).sort_index()
         y_pred_all = pd.concat(all_pred).sort_index()
@@ -273,7 +274,7 @@ def main() -> None:
         print("\n=== Phase 5: Regime-conditioned metrics (ridge) ===")
         print(by_regime)
 
-        
+
 
 
 
