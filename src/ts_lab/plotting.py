@@ -134,3 +134,13 @@ def summarize_regimes(regime_X: pd.DataFrame, regimes: pd.Series) -> pd.DataFram
     out[("meta", "count")] = counts 
     return out 
 
+def summarize_regime_features(regime_X: pd.DataFrame, regimes: pd.Series) -> pd.DataFrame:
+    """
+    Returns mean, std and count of each regime feature per regime
+    """
+
+    df = pd.concat([regime_X, regimes.rename("regime")], axis=1).dropna()
+    summary = df.groupby("regime").agg(["mean", "std"])
+    counts = df["regime"].value_counts().sort_index()
+    summary[("meta", "count")] = counts 
+    return summary
