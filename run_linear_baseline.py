@@ -306,6 +306,18 @@ def main() -> None:
         strat_r = strategy_returns(signal, y_true_all)
         perf = performance_summary(strat_r)
 
+        active = signal != 0
+        strat_r_active = strat_r[active]
+        
+
+        perf_active = performance_summary(strat_r_active)
+        print("\n=== Regime-filtered strategy performance (ACTIVE days only) ===")
+        for k,v in perf_active.items():
+            print(f"{k:>15s}: {v:.6f}")
+
+        print("\nActive days:", int(active.sum()), "out of", len(signal))
+
+
         print("\n=== Phase 5 step 9: Regime-filtered strategy performance ===")
         for k, v in perf.items():
             print(f"{k:>15s}: {v:.6f}")
