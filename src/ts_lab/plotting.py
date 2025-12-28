@@ -144,3 +144,20 @@ def summarize_regime_features(regime_X: pd.DataFrame, regimes: pd.Series) -> pd.
     counts = df["regime"].value_counts().sort_index()
     summary[("meta", "count")] = counts 
     return summary
+
+def plot_single_regime(
+    close: pd.Series,
+    regimes: pd.Series, 
+    target_regime: int, 
+    title: str | None = None, 
+) -> None:
+    df = pd.concat([close.rename("close"), regimes.rename("regime")], axis=1).dropna()
+    mask = df["regime"] == target_regime
+
+    plt.figure()
+    plt.plot(df.index, df["close"], label="close", alpha=0.5)
+    plt.scatter(df.index[mask], df["close"][mask], color="red", s=15, label=f"regime {target_regime}")
+    plt.legend()
+    plt.title(title or f"Regime {target_regime} highlighted")
+    plt.tight_layout()
+    plt.show()

@@ -12,7 +12,7 @@ from src.ts_lab.models.regularized import make_ridge, make_lasso, make_elasticne
 from src.ts_lab.models.trees import make_random_forest, make_hist_gb
 from src.ts_lab.evaluation import regression_report
 from src.ts_lab.walkforward import walk_forward_cv_with_baselines
-from src.ts_lab.plotting import plot_lin_reg, plot_folds, plot_folds_multi, plot_regimes_over_price, summarize_regimes
+from src.ts_lab.plotting import plot_lin_reg, plot_folds, plot_folds_multi, plot_regimes_over_price, summarize_regimes, summarize_regime_features, plot_single_regime
 from src.ts_lab.experiments import evaluate_feature_sets
 from src.ts_lab.feature_checks import print_feature_sanity, plot_feature_corr_with_target
 from src.ts_lab.split import train_test_split_time
@@ -274,14 +274,19 @@ def main() -> None:
         print("\n=== Phase 5: Regime-conditioned metrics (ridge) ===")
         print(by_regime)
 
+        
+        # Area for regime validation
+        summary = summarize_regime_features(regime_X, regime_labels)
+        print("\n=== Phase 5 step 8: Regime feature summary")
+        print(summary)
 
+        plot_single_regime(close, 
+                           regime_labels,
+                           target_regime=2,
+                           title="Phase 5 step 8: Stress regime (K=4)")
 
-
-
-
-
-
-   
+        print("\n=== Phase 5 step 8: Regime counts by year ===")
+        print(regime_labels.groupby(regime_labels.index.year).value_counts().unstack(fill_value=0))
     
 if __name__ == "__main__":
     main()
