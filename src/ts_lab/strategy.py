@@ -19,10 +19,10 @@ def regime_filtered_signal(
     df = pd.concat([y_pred.rename("pred"), regimes.rename("regime")], axis=1)
 
     signal = pd.Series(0.0, index=df.index)
-    active  = df["regime"] == active_regime 
+    active = df["regime"] == active_regime 
 
-    signal[active & (df["pred"] > threshold)] == 1.0 
-    signal[active & (df["pred"] < -threshold)] == -1.0
+    signal[active & (df["pred"] > threshold)] = 1.0 
+    signal[active & (df["pred"] < -threshold)] = -1.0
 
     signal.name = "signal"
     return signal

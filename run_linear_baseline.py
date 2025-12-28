@@ -276,7 +276,7 @@ def main() -> None:
 
         regimes_for_preds = regime_labels.reindex(y_pred_all.index)
 
-        by_regime = metrics_by_regime(y_true_all, y_pred_all, regimes_aligned)
+        by_regime = metrics_by_regime(y_true_all, y_pred_all, regimes_for_preds)
         print("\n=== Phase 5: Regime-conditioned metrics (ridge) ===")
         print(by_regime)
 
@@ -295,6 +295,7 @@ def main() -> None:
         print(regime_labels.groupby(regime_labels.index.year).value_counts().unstack(fill_value=0))
     
     if RUN_PHASE5_STRATEGY:
+        
         signal = regime_filtered_signal(
             y_pred = y_pred_all,
             regimes=regimes_for_preds,
