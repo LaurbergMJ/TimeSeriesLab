@@ -21,7 +21,7 @@ from src.ts_lab.tuning import tune_model_ts
 from src.ts_lab.coef_stability import collect_fold_coefs, coef_stability_summary
 from src.ts_lab.regimes import assign_regimes
 from src.ts_lab.regime_eval import metrics_by_regime
-from src.ts_lab.strategy import regime_filtered_signal, strategy_returns, performance_summary
+from src.ts_lab.strategy import regime_filtered_signal, strategy_returns, performance_summary, regime_filtered_signal_with_persistence
 
 #-------------
 # Lab Settings
@@ -52,6 +52,7 @@ PHASE5_MODEL_FEATURE_SET = "basic"
 PHASE5_HORIZON = 1
 RUN_PHASE5_STRATEGY = True 
 ACTIVE_REGIME = 2
+MIN_CONSECUTIVE_DAYS = 3
 
 FEATURE_SETS = [
     "basic",
@@ -296,12 +297,22 @@ def main() -> None:
     
     if RUN_PHASE5_STRATEGY:
         
-        signal = regime_filtered_signal(
-            y_pred = y_pred_all,
+        # signal = regime_filtered_signal(
+        #     y_pred = y_pred_all,
+        #     regimes=regimes_for_preds,
+        #     active_regime=ACTIVE_REGIME,
+        #     threshold=0.0,
+        # )
+
+        signal = regime_filtered_signal_with_persistence(
+            y_pred=y_pred_all,
             regimes=regimes_for_preds,
             active_regime=ACTIVE_REGIME,
+            min_consecutive_days=MIN_CONSECUTIVE_DAYS,
             threshold=0.0,
         )
+
+
 
         strat_r = strategy_returns(signal, y_true_all)
         perf = performance_summary(strat_r)
@@ -309,13 +320,18 @@ def main() -> None:
         active = signal != 0
         strat_r_active = strat_r[active]
         
+        print("\nActive days:", int(active.sum()), "out of", len(signal))
 
         perf_active = performance_summary(strat_r_active)
         print("\n=== Regime-filtered strategy performance (ACTIVE days only) ===")
         for k,v in perf_active.items():
             print(f"{k:>15s}: {v:.6f}")
 
-        print("\nActive days:", int(active.sum()), "out of", len(signal))
+        
+        perf_all = performance_summary(strat_r)
+        print("\n=== Regime-filtered strategy performance (ALL days) ===")
+        for k, v in perf_all.items():
+            print(f"{k:>15s}: {v:.6f}")
 
 
         print("\n=== Phase 5 step 9: Regime-filtered strategy performance ===")
