@@ -150,7 +150,8 @@ def plot_single_regime(
     regimes: pd.Series, 
     target_regime: int, 
     title: str | None = None, 
-) -> None:
+    ) -> None:
+    
     df = pd.concat([close.rename("close"), regimes.rename("regime")], axis=1).dropna()
     mask = df["regime"] == target_regime
 

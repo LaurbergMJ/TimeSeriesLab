@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 from src.ts_lab.settings import SETTINGS
 from src.ts_lab.data_io import load_close_data, list_csv_files
@@ -20,6 +21,7 @@ from src.ts_lab.tuning import tune_model_ts
 from src.ts_lab.coef_stability import collect_fold_coefs, coef_stability_summary
 from src.ts_lab.regimes import assign_regimes
 from src.ts_lab.regime_eval import metrics_by_regime
+from src.ts_lab.strategy import regime_filtered_signal, strategy_returns, performance_summary
 
 #-------------
 # Lab Settings
@@ -48,6 +50,8 @@ RUN_PHASE5_REGIMES = True
 N_REGIMES = 4
 PHASE5_MODEL_FEATURE_SET = "basic"
 PHASE5_HORIZON = 1
+RUN_PHASE5_STRATEGY = True 
+ACTIVE_REGIME = 2
 
 FEATURE_SETS = [
     "basic",
@@ -270,6 +274,8 @@ def main() -> None:
         y_true_all = pd.concat(all_true).sort_index()
         y_pred_all = pd.concat(all_pred).sort_index()
 
+        regimes_for_preds = regime_labels.reindex(y_pred_all.index)
+
         by_regime = metrics_by_regime(y_true_all, y_pred_all, regimes_aligned)
         print("\n=== Phase 5: Regime-conditioned metrics (ridge) ===")
         print(by_regime)
@@ -288,5 +294,34 @@ def main() -> None:
         print("\n=== Phase 5 step 8: Regime counts by year ===")
         print(regime_labels.groupby(regime_labels.index.year).value_counts().unstack(fill_value=0))
     
+    if RUN_PHASE5_STRATEGY:
+        signal = regime_filtered_signal(
+            y_pred = y_pred_all,
+            regimes=regimes_for_preds,
+            active_regime=ACTIVE_REGIME,
+            threshold=0.0,
+        )
+
+        strat_r = strategy_returns(signal, y_true_all)
+        perf = performance_summary(strat_r)
+
+        print("\n=== Phase 5 step 9: Regime-filtered strategy performance ===")
+        for k, v in perf.items():
+            print(f"{k:>15s}: {v:.6f}")
+
+        # Compare to always-on strategy
+        always_on_signal = pd.Series(
+            np.sign(y_pred_all),
+            index=y_pred_all.index,
+            name="always_on_signal",
+        )
+        always_on_r = strategy_returns(always_on_signal, y_true_all)
+        always_on_perf = performance_summary(always_on_r)
+
+        print("\n=== Always-on Ridge strategy (comparison) ===")
+        for k,v in always_on_perf.items():
+            print(f"{k:>15s}: {v:.6f}")
+
+
 if __name__ == "__main__":
     main()
