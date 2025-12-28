@@ -27,6 +27,30 @@ def regime_filtered_signal(
     signal.name = "signal"
     return signal
 
+def regime_filtered_signal_with_persistence(
+    y_pred: pd.Series, 
+    regimes: pd.Series,
+    active_regime: int, 
+    min_consecutive_days: int = 2,
+    threshold: float = 0.0, 
+    ) -> pd.Series:
+
+    """
+    Same as regime_filtered_signal, but only active if regime persists >= N days
+    """
+    pred = y_pred.astype(float)
+    reg = regimes.astype(int)
+
+    persisted = regime_persistence_mask(reg, active_regime, min_consecutive_days=min_consecutive_days)
+
+    s = pd.Series(0.0, index=pred.index, name="signal")
+    signed = np.sign(pred)
+    signed[(pred.abs() <= threshold)] = 0.0
+
+    s[persisted] = signed[persisted]
+    return s 
+
+
 def strategy_returns(
     signal: pd.Series, 
     y_true: pd.Series,
@@ -59,4 +83,27 @@ def performance_summary(r: pd.Series) -> dict[str, float]:
         "max_drawdown": (r.cumsum() - r.cumsum().cummax()).min(),
     }
     return out 
+
+def regime_persistence_mask(
+        regimes: pd.Series, 
+        active_regime: int, 
+        min_consecutive_days: int = 2,
+    ) -> pd.Series:
+    
+    """
+    Returns a boolean mask - true on dates where active_regime has persisted
+    for >= min_consecutive_days ending at that date
+    """
+
+    reg = regimes.astype(int)
+    is_active = (reg == int(active_regime)).astype(int)
+
+    # rolling sum over consecutive days - True if last N days were active (sum == N)
+
+    persisted = is_active.rolling(min_consecutive_days).sum() == min_consecutive_days
+    persisted = persisted.fillna(False)
+    persisted.name = "regime_persisted"
+    return persisted
+
+
 
