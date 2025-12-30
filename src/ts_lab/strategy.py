@@ -105,5 +105,25 @@ def regime_persistence_mask(
     persisted.name = "regime_persisted"
     return persisted
 
+def vol_scaled_weights(
+    signal: pd.Series,
+    vol: pd.Series, 
+    target_vol: float = 0.01, # 1% daily vol target
+    max_leverage: float = 2.0,
+    eps: float = 1e-12, 
+) -> pd.Series:
+    
+    """
+    Convert {-1, 0, +1} signals into volatility-scaled weights
+    weight_t = signal_t * target_vol / vol_t, capped at max leverage
+    """
 
+    s = signal.astype(float)
+    v = vol.astype(float)
+
+    raw = s * (target_vol / (v + eps))
+    capped = raw.clip(lower=-max_leverage, upper=max_leverage)
+    capped.name = "weight"
+    return capped 
+    
 

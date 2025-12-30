@@ -19,10 +19,10 @@ from src.ts_lab.feature_checks import print_feature_sanity, plot_feature_corr_wi
 from src.ts_lab.split import train_test_split_time
 from src.ts_lab.tuning import tune_model_ts
 from src.ts_lab.coef_stability import collect_fold_coefs, coef_stability_summary
-from src.ts_lab.regimes import assign_regimes
+from src.ts_lab.regimes import assign_regimes, pick_crisis_regime
 from src.ts_lab.regime_eval import metrics_by_regime
-from src.ts_lab.strategy import regime_filtered_signal, strategy_returns, performance_summary, regime_filtered_signal_with_persistence
-
+from src.ts_lab.strategy import regime_filtered_signal, strategy_returns, performance_summary, regime_filtered_signal_with_persistence, vol_scaled_weights
+from src.ts_lab.regimes_oos import fit_regimes_on_train
 #-------------
 # Lab Settings
 #-------------
@@ -53,6 +53,8 @@ PHASE5_HORIZON = 1
 RUN_PHASE5_STRATEGY = True 
 ACTIVE_REGIME = 2
 MIN_CONSECUTIVE_DAYS = 3
+RUN_PHASE5_OOS = True
+TRAIN_FRAC = 0.7
 
 FEATURE_SETS = [
     "basic",
@@ -237,6 +239,10 @@ def main() -> None:
         
         # 1) Fit regimes on the full history (first pass)
         regime_X, regime_labels, _ = assign_regimes(close, n_regimes=N_REGIMES)
+
+        # vol series for sizing
+        vol_for_sizing_full = regime_X["vol_20"]
+
         print("\n=== Phase 5: Regime summary (feature means/std + counts) ===")
         print(summarize_regimes(regime_X, regime_labels))
 
@@ -275,6 +281,9 @@ def main() -> None:
         y_true_all = pd.concat(all_true).sort_index()
         y_pred_all = pd.concat(all_pred).sort_index()
 
+        # vol for preds
+        vol_for_preds = vol_for_sizing_full.reindex(y_pred_all.index)
+
         regimes_for_preds = regime_labels.reindex(y_pred_all.index)
 
         by_regime = metrics_by_regime(y_true_all, y_pred_all, regimes_for_preds)
@@ -312,14 +321,27 @@ def main() -> None:
             threshold=0.0,
         )
 
+        weights = vol_scaled_weights(
+            signal=signal,
+            vol=vol_for_preds,
+            target_vol=0.01,
+            max_leverage=2.0
+        )
 
+        # strategy returns with sizing
+        strat_r = weights * y_true_all
+        strat_r.name = "strategy return"
 
-        strat_r = strategy_returns(signal, y_true_all)
+        #strat_r = strategy_returns(signal, y_true_all)
         perf = performance_summary(strat_r)
 
-        active = signal != 0
+        #active = signal != 0
+
+        active = weights != 0
+
         strat_r_active = strat_r[active]
         
+        print("\nExposure:", float(active.mean()))
         print("\nActive days:", int(active.sum()), "out of", len(signal))
 
         perf_active = performance_summary(strat_r_active)
@@ -350,6 +372,90 @@ def main() -> None:
         print("\n=== Always-on Ridge strategy (comparison) ===")
         for k,v in always_on_perf.items():
             print(f"{k:>15s}: {v:.6f}")
+
+
+    if RUN_PHASE5_OOS:
+
+        # 1) Fit regimes on TRAIN only and predict regimes on TEST
+        Xr_train, reg_train, Xr_test, reg_test, pipe, split_date = fit_regimes_on_train(
+            close=close,
+            n_regimes=N_REGIMES,
+            train_frac=TRAIN_FRAC,
+            random_state=42,
+        )
+        crisis_regime = pick_crisis_regime(Xr_train, reg_train)
+        print("\n=== Phase 5 step 12: OOS regime test ===")
+        print("Split date:", split_date)
+        print("Crisis regime (from TRAIN vol_20):", crisis_regime)
+        print("TEST regime counts:\n", reg_test.value_counts().sort_index())
+
+        # 2) Build supervised dataset and keep only TEST period (by date)
+        X, y = make_supervised(close, feature_set=PHASE5_MODEL_FEATURE_SET, horizon=PHASE5_HORIZON)
+        X_test = X.loc[X.index >= split_date]
+        y_test = y.loc[y.index >= split_date]
+
+        # 3) Predict with a walk-forward model ONLY on TEST period (rolling CV inside test)
+        # this avoids training on future relative to test window
+        model = make_ridge(alpha=1.0)
+
+        metrics_df, fold_results = walk_forward_cv_with_baselines(
+            model, 
+            X_test, y_test,
+            n_splits=max(3, min(6, N_SPLITS)),
+            rolling_mean_window=ROLLING_MEAN_WINDOW,
+            model_name="ridge_oos",
+        )
+
+        cols = ["mae", "rmse", "r2", "directional_accuracy", "corr"]
+        print("\n=== Phase 5 step 12: OOS walk-forward mean metrics (TEST only) ===")
+        print(metrics_df.groupby("model")[cols].mean())
+
+        # Stitch OOS predictions from folds
+        all_true, all_pred = [], []
+        for fr in fold_results:
+            if "ridge_oos" in fr.preds:
+                all_true.append(fr.y_true)
+                all_pred.append(fr.preds["ridge_oos"])
+        y_true_oos = pd.concat(all_true).sort_index()
+        y_pred_oos = pd.concat(all_pred).sort_index()
+
+        # 4) Align TEST regimes + vol series to prediction dates
+        regimes_oos = reg_test.reindex(y_pred_oos.index).ffill()
+        vol_oos = Xr_test["vol_20"].reindex(y_pred_oos.index).ffill()
+
+        # 5) Build signal: crisis-only + persistence + vol scaling
+        signal_oos = regime_filtered_signal_with_persistence(
+            y_pred=y_pred_oos,
+            regimes=regimes_oos,
+            active_regime=crisis_regime,
+            min_consecutive_days=MIN_CONSECUTIVE_DAYS,
+            threshold=0.0
+        )
+
+        weight_oos = vol_scaled_weights(
+            signal=signal_oos,
+            vol=vol_oos,
+            target_vol=0.01,
+            max_leverage=2.0,
+        )
+
+        strat_r_oos = (weight_oos * y_true_oos).rename("strategy_return")
+
+        active = weight_oos != 0
+        print("\nExposure (OOS):", float(active.mean()))
+        print("Active days (OOS):", int(active.sum()), "out of", len(active))
+
+        perf_active = performance_summary(strat_r_oos[active])
+        print("\n=== Phase 5 Step 12: OOS Performance (ACTIVE days only) ===")
+        for k,v in perf_active.items():
+            print(f"{k:>15s}: {v:.6f}")
+
+        perf_all = performance_summary(strat_r_oos)
+        print("\n=== Phase 5 step 12: OOS performance (ALL days) ====")
+        for k, v in perf_all.items():
+            print(f"{k:>15s}: {v:.6f}")
+
+            
 
 
 if __name__ == "__main__":

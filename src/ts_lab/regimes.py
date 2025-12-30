@@ -73,3 +73,9 @@ def assign_regimes(
     regime_labels = pd.Series(labels, index=regime_X.index, name="regime")
     return regime_X, regime_labels, pipe
 
+def pick_crisis_regime(regime_X_train: pd.DataFrame, reg_train: pd.Series) -> int:
+    df = regime_X_train.join(reg_train.rename("regime")).dropna()
+
+    # crisis = highest vol_20 mean
+    return int(df.groupby("regime")["vol_20"].mean().idxmax())
+
