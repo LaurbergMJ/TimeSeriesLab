@@ -20,8 +20,12 @@ def baseline_rolling_mean(y_train: pd.Series, y_test: pd.Series, window: int=20)
 def pred_zero(y_test: pd.Series) -> pd.Series:
     return pd.Series(0.0, index=y_test.index, name="zero")
 
-def pred_last(y_test: pd.Series) -> pd.Series:
-    return y_test.shift(1).fillna(0.0).rename("last")
+def pred_last(y_all: pd.Series, test_index: pd.Index) -> pd.Series:
+    y_shift = y_all.shift(1)
+    pred = y_shift.reindex(test_index)
+    pred.name = "last"
+       
+    return pred
 
 def pred_rolling_mean(y_all: pd.Series, test_index: pd.Index, window: int=20) -> pd.Series:
 

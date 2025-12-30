@@ -16,7 +16,7 @@ def regression_report(y_true: pd.Series, y_pred: np.ndarray) -> dict:
         "rmse": float(np.sqrt(mse)),
         "r2": float(r2_score(y_true, y_pred)),
         "directional_accuracy": directional_accuracy(y_true, y_pred),
-        "corr": float(np.corrcoef(y_true.values, y_pred)[0, 1])
+        "corr": float(np.corrcoef(y_true.values, y_pred)[0, 1]),
     }
 
 

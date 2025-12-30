@@ -7,7 +7,8 @@ import numpy as np
 
 from src.ts_lab.settings import SETTINGS
 from src.ts_lab.data_io import load_close_data, list_csv_files
-from src.ts_lab.features import make_supervised 
+from src.ts_lab.features import make_supervised
+from src.ts_lab.features_vol import make_supervised_vol 
 from src.ts_lab.models.linear_regression import make_linear_regression_pipeline
 from src.ts_lab.models.regularized import make_ridge, make_lasso, make_elasticnet
 from src.ts_lab.models.trees import make_random_forest, make_hist_gb
@@ -46,15 +47,17 @@ PHASE3_SCORING = "neg_root_mean_squared_error"
 RUN_PHASE4_TREES = False 
 PHASE4_FEATURE_SET = "v1_small"
 PHASE4_HORIZON = 1
-RUN_PHASE5_REGIMES = True 
+RUN_PHASE5_REGIMES = False 
 N_REGIMES = 4
 PHASE5_MODEL_FEATURE_SET = "basic"
 PHASE5_HORIZON = 1
-RUN_PHASE5_STRATEGY = True 
+RUN_PHASE5_STRATEGY = False 
 ACTIVE_REGIME = 2
 MIN_CONSECUTIVE_DAYS = 3
-RUN_PHASE5_OOS = True
+RUN_PHASE5_OOS = False
 TRAIN_FRAC = 0.7
+RUN_PHASE6_VOL = True
+VOL_TARGET_WINDOW = 5
 
 FEATURE_SETS = [
     "basic",
@@ -456,6 +459,26 @@ def main() -> None:
             print(f"{k:>15s}: {v:.6f}")
 
             
+    if RUN_PHASE6_VOL:
+        Xv, yv = make_supervised_vol(close, target_window=VOL_TARGET_WINDOW, annualize_target=False)
+
+        model = make_ridge(alpha=1.0)
+
+        metrics_df, fold_results = walk_forward_cv_with_baselines(
+            model, 
+            Xv, yv,
+            n_splits=N_SPLITS,
+            rolling_mean_window=ROLLING_MEAN_WINDOW,
+            model_name="ridge_vol"
+        )
+
+        cols = ["mae", "rmse", "r2", "directional_accuracy", "corr"]
+        print("\n=== Phase 6: Vol forecasting mean metrics ===")
+        print(metrics_df.groupby("model")[cols].mean())
+
+        
+
+
 
 
 if __name__ == "__main__":
