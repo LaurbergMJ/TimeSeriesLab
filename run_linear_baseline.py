@@ -462,6 +462,13 @@ def main() -> None:
     if RUN_PHASE6_VOL:
         Xv, yv = make_supervised_vol(close, target_window=VOL_TARGET_WINDOW, annualize_target=False)
 
+        print("\n[Sanity]")
+        print("corr(rv_last, y):", float(Xv["rv_last"].corr(yv)))
+
+        y_lag = yv.shift(1).reindex(yv.index)
+        print("corr(y_lag1, y):", float(y_lag.corr(yv)))
+
+
         model = make_ridge(alpha=1.0)
 
         metrics_df, fold_results = walk_forward_cv_with_baselines(

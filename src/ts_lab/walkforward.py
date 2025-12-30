@@ -47,12 +47,18 @@ def walk_forward_cv_with_baselines(
 
         preds: dict[str, pd.Series] = {
             model_name: y_pred_main,
-            "zero": pred_zero(y_test),
-            "last": pred_last(y_all=y_all, test_index=y_test.index),
-            f"mean_{rolling_mean_window}": pred_rolling_mean(
-                y_all=y_all, test_index=y_test.index, window=rolling_mean_window
-            ),
+            "y_lag1": y_all.shift(1).reindex(y_test.index),
+            f"mean_{rolling_mean_window}": pred_rolling_mean(y_all=y_all, test_index=y_test.index, window=rolling_mean_window)         
+            
+            # "zero": pred_zero(y_test),
+            # "last": pred_last(y_all=y_all, test_index=y_test.index),
+            # f"mean_{rolling_mean_window}": pred_rolling_mean(
+            #     y_all=y_all, test_index=y_test.index, window=rolling_mean_window
+            # ),
         }
+
+        if "rv_last" in X_test.columns:
+            preds["rv_last"] = X_test["rv_last"]
 
         metrics: dict[str, dict[str, float]] = {}
 
