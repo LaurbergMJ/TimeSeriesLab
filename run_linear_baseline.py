@@ -24,6 +24,7 @@ from src.ts_lab.regimes import assign_regimes, pick_crisis_regime
 from src.ts_lab.regime_eval import metrics_by_regime
 from src.ts_lab.strategy import regime_filtered_signal, strategy_returns, performance_summary, regime_filtered_signal_with_persistence, vol_scaled_weights
 from src.ts_lab.regimes_oos import fit_regimes_on_train
+from src.ts_lab.features_state import build_state_features
 #-------------
 # Lab Settings
 #-------------
@@ -56,8 +57,9 @@ ACTIVE_REGIME = 2
 MIN_CONSECUTIVE_DAYS = 3
 RUN_PHASE5_OOS = False
 TRAIN_FRAC = 0.7
-RUN_PHASE6_VOL = True
+RUN_PHASE6_VOL = False
 VOL_TARGET_WINDOW = 5
+RUN_PHASE7_ANALOGS = True
 
 FEATURE_SETS = [
     "basic",
@@ -483,8 +485,13 @@ def main() -> None:
         print("\n=== Phase 6: Vol forecasting mean metrics ===")
         print(metrics_df.groupby("model")[cols].mean())
 
-    if RUN_PHASE7_VALIDATION:
-        
+    if RUN_PHASE7_ANALOGS: # Similarity search/analog analysis
+        X_state = build_state_features(close)
+        print("\n=== Phase 7.1: State features ===")
+        print(X_state.describe())
+
+
+
 
         
 
