@@ -25,6 +25,9 @@ from src.ts_lab.regime_eval import metrics_by_regime
 from src.ts_lab.strategy import regime_filtered_signal, strategy_returns, performance_summary, regime_filtered_signal_with_persistence, vol_scaled_weights
 from src.ts_lab.regimes_oos import fit_regimes_on_train
 from src.ts_lab.features_state import build_state_features
+from src.ts_lab.analogs import fit_state_scaler, transform_states, fit_knn, query_analogs
+from src.ts_lab.forward_outcomes import forward_returns, forward_volatility
+
 #-------------
 # Lab Settings
 #-------------
@@ -489,6 +492,117 @@ def main() -> None:
         X_state = build_state_features(close)
         print("\n=== Phase 7.1: State features ===")
         print(X_state.describe())
+
+        scaler = fit_state_scaler(X_state)
+        Z = transform_states(X_state, scaler)
+
+        nn = fit_knn(Z, n_neighbors=50)
+
+        test_date = Z.index[-1]
+        neighbors = query_analogs(
+            t=test_date,
+            Z=Z,
+            nn=nn, 
+            min_lookback_days=252,
+            k=10
+        )
+
+        print("\n=== Phase 7.2: Analog dates ===")
+        print("Query date:", test_date)
+        print("Analog dates:", neighbors.tolist())
+
+        horizon = 5 
+
+        analog_rets = forward_returns(
+            close, 
+            start_dates=neighbors,
+            horizon=horizon
+        )
+
+        analog_vols = forward_volatility(
+            close, 
+            start_dates=neighbors,
+            horizon=horizon
+        )
+
+        print("\n=== Phase 7.3: Analog forward outcomes ===")
+        print("Forward returns:")
+        print(analog_rets)
+
+        print("\nForward volatilities:")
+        print(analog_vols)
+
+        print("nSummary (analogs only):")
+        print(pd.concat([analog_rets, analog_vols], axis=1).describe())
+
+        # Unconditional comparison
+        all_dates = Z.index[:-horizon]
+
+        uncond_rets = forward_returns(
+            close, 
+            start_dates=all_dates,
+            horizon=horizon,
+        )
+
+        uncond_vols = forward_volatility(
+            close, 
+            start_dates=all_dates,
+            horizon=horizon
+        )
+
+        print("\n=== Phase 7.3: Unconditional outcomes ===")
+        print(pd.concat([uncond_rets, uncond_vols], axis=1).describe())
+
+
+        plt.figure(figsize=(12,5))
+        plt.plot(close, label="price", alpha=0.7)
+
+        plt.scatter(
+            neighbors,
+            close.loc[neighbors],
+            color="red",
+            label="Analogs",
+            zorder=3
+        )
+
+        plt.scatter(
+            test_date,
+            close.loc[test_date],
+            color="black",
+            marker="x",
+            s=100,
+            label="Query date",
+            zorder=4
+        )
+
+        plt.title("Phase 7.4: Analog dates on price chart")
+        plt.legend()
+        plt.show()
+
+        analog_states = X_state.loc[neighbors]
+        query_state = X_state.loc[[test_date]]
+
+        print("\n==== Phase 7.4: Feature comparison ===")
+        print(pd.concat([
+            query_state.assign(type="query"),
+            analog_states.assign(type="analog")
+        ]).groupby("type").mean())
+
+        plt.figure(figsize=(10, 4))
+        plt.hist(uncond_rets, bins=50, alpha=0.5, label="Unconditional", density=True)
+        plt.hist(analog_rets, bins=10, alpha=0.8, label="Analogs", density=True)
+        plt.axvline(analog_rets.mean(), color="red", linestyle="--", label="Analog mean")
+        plt.axvline(uncond_rets.mean(), color="black", linestyle="--", label="Uncond mean")
+        plt.legend()
+        plt.title("Phase 7.4: Forward return distribution")
+        plt.show()
+
+
+
+
+
+
+        
 
 
 
