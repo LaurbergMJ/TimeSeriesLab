@@ -597,6 +597,42 @@ def main() -> None:
         plt.title("Phase 7.4: Forward return distribution")
         plt.show()
 
+        # Phase 7.5 
+        regime_X, regime_labels, _ = assign_regimes(close, n_regimes=N_REGIMES)
+
+        analog_regimes = regime_labels.reindex(neighbors)
+
+        print("\n === Phase 7.5: Analog regimes ===")
+        print(analog_regimes)
+
+        # Phase 7.5.3
+        analog_counts = analog_regimes.value_counts().sort_index()
+        analog_frac = analog_counts / analog_counts.sum()
+
+        # Unconditional regime distribution - same sample
+        uncond_counts = regime_labels.loc[Z.index].value_counts().sort_index()
+        uncond_frac = uncond_counts / uncond_counts.sum()
+
+        regime_compare = pd.DataFrame({
+            "analog_frac": analog_frac,
+            "unconditional_frac": uncond_frac,
+        }).fillna(0.0)
+
+        print("\n=== Phase 7.5: Regime distribution (analogs vs unconditional) ===")
+        print(regime_compare)
+
+        # Plot
+        regime_compare.plot(
+            kind="bar",
+            figsize=(8, 4),
+            title="Phase 7.5: Regime distribution - Analogs vs Unconditional",
+        )
+        plt.ylabel("Fraction")
+        plt.show()
+
+
+
+
 
 
 
