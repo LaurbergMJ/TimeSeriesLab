@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from collections import Counter
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -25,7 +26,7 @@ from src.ts_lab.regime_eval import metrics_by_regime
 from src.ts_lab.strategy import regime_filtered_signal, strategy_returns, performance_summary, regime_filtered_signal_with_persistence, vol_scaled_weights
 from src.ts_lab.regimes_oos import fit_regimes_on_train
 from src.ts_lab.features_state import build_state_features
-from src.ts_lab.analogs import fit_state_scaler, transform_states, fit_knn, query_analogs
+from src.ts_lab.analogs import fit_state_scaler, transform_states, fit_knn, query_analogs, compute_risk_flags, classify_risk_state
 from src.ts_lab.forward_outcomes import forward_returns, forward_volatility
 
 #-------------
@@ -51,7 +52,7 @@ PHASE3_SCORING = "neg_root_mean_squared_error"
 RUN_PHASE4_TREES = False 
 PHASE4_FEATURE_SET = "v1_small"
 PHASE4_HORIZON = 1
-RUN_PHASE5_REGIMES = False 
+RUN_PHASE5_REGIMES = True
 N_REGIMES = 4
 PHASE5_MODEL_FEATURE_SET = "basic"
 PHASE5_HORIZON = 1
@@ -63,6 +64,7 @@ TRAIN_FRAC = 0.7
 RUN_PHASE6_VOL = False
 VOL_TARGET_WINDOW = 5
 RUN_PHASE7_ANALOGS = True
+RUN_PHASE8_STABILITY = True
 
 FEATURE_SETS = [
     "basic",
@@ -629,6 +631,196 @@ def main() -> None:
         )
         plt.ylabel("Fraction")
         plt.show()
+
+        # Phase 7.6 - Time-varying analogs --- 
+        query_dates = Z.index[::20]
+        query_dates = query_dates[query_dates >= Z.index[0] + pd.Timedelta(days=500)]
+
+        records = []
+        horizon = 5
+        k = 10
+
+        for t in query_dates:
+            analogs_t = query_analogs(
+                t=t,
+                Z=Z,
+                nn=nn,
+                min_lookback_days=252,
+                k=k
+            )
+
+            if len(analogs_t) < k:
+                continue 
+
+            # Forward outcomes
+            fwd_ret = forward_returns(close, analogs_t, horizon=horizon)
+            fwd_vol = forward_volatility(close, analogs_t, horizon=horizon)
+
+            # Regime composition
+            reg_t = regime_labels.reindex(analogs_t).dropna()
+            dominant_regime = Counter(reg_t).most_common(1)[0][0]
+
+            records.append({
+                "date": t,
+                "analog_ret_mean": fwd_ret.mean(),
+                "analog_ret_median": fwd_ret.median(),
+                "analog_vol_mean": fwd_vol.mean(),
+                "dominant_regime": dominant_regime
+            })
+
+        analog_ts = pd.DataFrame(records).set_index("date")
+        print("\n=== Phase 7.6: Rolling analog summary ===")
+        print(analog_ts.head())
+
+        # 7.6.3 - Visualization
+        fig, ax = plt.subplots(figsize=(12, 4))
+
+        ax.plot(analog_ts.index, analog_ts["analog_ret_mean"], label="Analog mean fwd return")
+        ax.axhline(0, color="black", linestyle="--", alpha=0.5)
+
+        ax.set_title("Phase 7.6: Time-varying analog forward return expectations")
+        ax.legend()
+        plt.show()
+
+        # Rolling analog volatility
+        fig, ax = plt.subplots(figsize=(12, 4))
+
+        ax.plot(analog_ts.index, analog_ts["analog_vol_mean"], label="Analog mean fwd vol")
+        ax.set_title("Phase 7.6: Time-varying analog volatility expectation")
+        ax.legend()
+        plt.show()
+
+
+        # Dominant regime over time
+        fig, ax = plt.subplots(figsize=(12, 3))
+        ax.plot(analog_ts.index, analog_ts["dominant_regime"], drawstyle="steps-post")
+        ax.set_title("Phase 7.6: Dominant analog regime over time")
+        ax.set_ylabel("Regime")
+        plt.show()
+
+        # Classify Risk States
+        risk_flags = compute_risk_flags(
+            analog_ts, 
+            uncond_ret_mean=uncond_rets.mean(),
+            uncond_vol_median=uncond_vols.median(),
+        )
+
+        risk_flags["risk_state"] = risk_flags.apply(classify_risk_state, axis=1)
+
+        print("\n=== Phase 7.7: Risk state snapshot ===")
+        print(risk_flags.tail())
+
+    if RUN_PHASE8_STABILITY:
+
+        time_splits = {
+            "early": ("2010-01-01", "2015-12-31"),
+            "mid": ("2016-01-01", "2020-12-31"),
+            "late": ("2021-01-01", "2025-12-31")
+        }
+
+        # Step 8.1.2 - Regime stability
+        print("\n === Phase 8.1: Regime stability by subsample ===")
+
+        for name, (start, end) in time_splits.items():
+            mask = (regime_labels.index >= start) & (regime_labels.index <= end)
+            frac = regime_labels.loc[mask].value_counts(normalize=True).sort_index()
+
+            print(f"\n{name.upper()} sample:")
+            print(frac)
+
+        # Step 8.1.3 - Analog outcome stability across time
+        print("\n=== Phase 8.1: Analog outcome stability ===")
+
+        for name, (start, end) in time_splits.items():
+            dates = analog_ts.index 
+            mask = (dates >= start) & (dates <= end)
+            sub = analog_ts.loc[mask]
+
+            if  len(sub) <5:
+                print(f"\n{name.upper()}: insufficient data")
+                continue 
+
+            print(f"\n{name.upper()} sample:")
+            print(sub[["analog_ret_mean", "analog_vol_mean"]].describe())
+
+        # Step 8.1.4 - Risk-state stability 
+        print("\n=== Phase 8.1: Risk-state stability ===")
+
+        for name, (start, end) in time_splits.items():
+            mask = (risk_flags.index >= start) & (risk_flags.index <= end)
+            freq = risk_flags.loc[mask, "risk_state"].value_counts(normalize=True)
+
+            print(f"\n{name.upper()} sample:")
+            print(freq)
+
+        # Step 8.4.1 - Implement random analog comparison
+        print("\n=== Phase 8.4.2: Null test - random analogs ===")
+
+        rng = np.random.default_rng(42)
+
+        horizon = 5
+        k = 10
+        n_trials = 100 
+
+        null_ret_means = []
+        null_vol_means = []
+
+        valid_dates = Z.index[:-252]
+
+        for _ in range(n_trials):
+            random_dates = rng.choice(valid_dates, size=k, replace=False)
+
+            ret = forward_returns(close, random_dates, horizon=horizon)
+            vol = forward_volatility(close, random_dates, horizon=horizon)
+
+            null_ret_means.append(ret.mean())
+            null_vol_means.append(vol.mean())
+
+        null_ret_means = np.array(null_ret_means)
+        null_vol_means = np.array(null_vol_means)
+
+        print("Null analog return mean:")
+        print(pd.Series(null_ret_means).describe())
+
+        print("\nNull analog vol mean:")
+        print(pd.Series(null_vol_means).describe())
+        
+        # Step 8.4.3 - Shuffle feature rows
+        print("\n=== Phase 8.4: Null test - shuffled state space ===")
+
+        Z_shuffled = Z.sample(frac=1.0, random_state=42)
+
+        nn_null = fit_knn(Z_shuffled, n_neighbors=50)
+
+        null2_ret_means = []
+
+        for t in query_dates[-20:]:
+            try:
+                analogs_null = query_analogs(
+                    t=t,
+                    Z=Z_shuffled,
+                    nn=nn_null,
+                    min_lookback_days=252,
+                    k=k,
+                )
+                if len(analogs_null) < k:
+                    continue
+
+                ret = forward_returns(close, analogs_null, horizon=horizon)
+                null2_ret_means.append(ret.mean())
+            except Exception:
+                continue
+
+        print("Shuffled-state analog return means:")
+        print(pd.Series(null2_ret_means).describe())
+
+
+        
+
+
+
+
+
 
 
 

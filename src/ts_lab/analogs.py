@@ -61,3 +61,48 @@ def query_analogs(
     return pd.Index(valid[:k])
 
 
+def compute_risk_flags(
+    analog_ts: pd.DataFrame,
+    uncond_ret_mean: float,
+    uncond_vol_median: float,
+    regime_stability_window: int = 3,
+) -> pd.DataFrame:
+    
+    df = analog_ts.copy()
+
+    df["return_flag"] = np.where(
+        df["analog_ret_mean"] < uncond_ret_mean,
+        "NEGATIVE",
+        "NEUTRAL",
+    )
+
+    df["vol_flag"] = np.where(
+        df["analog_vol_mean"] < uncond_vol_median,
+        "LOW_VOL",
+        "HIGH_VOL",
+    )
+
+    df["regime_stable"] = (
+        df["dominant_regime"]
+        .rolling(regime_stability_window)
+        .apply(lambda x: x.nunique() == 1, raw=False)
+        .fillna(False)
+    )
+
+    df["stability_flag"] = np.where(
+        df["regime_stable"],
+        "STABLE",
+        "UNSTABLE"
+    )
+
+    return df
+
+def classify_risk_state(row):
+    if row["return_flag"] == "NEGATIVE" and row["vol_flag"] == "LOW_VOL":
+        return "LOW_REWARD_ENV"
+    elif row["return_flag"] == "NEGATIVE" and row["vol_flag"] == "HIGH_VOL":
+        return "DEFENSIVE_ENV"
+    elif row["return_flag"] == "NEUTRAL" and row["vol_flag"] == "LOW_VOL":
+        return "BENIGN_ENV"
+    return "UNCERTAIN_ENV"
+
