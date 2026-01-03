@@ -814,31 +814,5 @@ def main() -> None:
         print("Shuffled-state analog return means:")
         print(pd.Series(null2_ret_means).describe())
 
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-        
-
-
-
-
 if __name__ == "__main__":
     main()
